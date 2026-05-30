@@ -2,6 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { Lead, AuditResult, OutreachDraft } from '../types';
 import WebSocket from 'ws';
 
+if (typeof globalThis !== 'undefined' && !globalThis.WebSocket) {
+  (globalThis as any).WebSocket = WebSocket;
+} else if (typeof global !== 'undefined' && !global.WebSocket) {
+  (global as any).WebSocket = WebSocket;
+}
+
 const getSupabase = () => {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_KEY;
