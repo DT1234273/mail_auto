@@ -119,19 +119,22 @@ Generate 3 realistic, but synthetic business leads for the completely automated 
 Category: ${category}
 City: ${city}
 
-Return exactly a JSON array matching this interface:
-[
-  {
-    "business_name": "string",
-    "category": "${category}",
-    "city": "${city}",
-    "website": "string (e.g. https://www...)",
-    "email": "string",
-    "phone": "string"
-  }
-]
+Return exactly a JSON object matching this interface:
+{
+  "leads": [
+    {
+      "business_name": "string",
+      "category": "${category}",
+      "city": "${city}",
+      "website": "string (e.g. https://www...)",
+      "email": "string",
+      "phone": "string"
+    }
+  ]
+}
 `;
 
   const text = await generateAiContent(prompt);
-  return JSON.parse(text || "[]") as Lead[];
+  const parsed = JSON.parse(text || "{}");
+  return (parsed.leads || parsed) as Lead[];
 }
