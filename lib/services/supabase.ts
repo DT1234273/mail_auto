@@ -2,20 +2,23 @@ import { createClient } from '@supabase/supabase-js';
 import { Lead, AuditResult, OutreachDraft } from '../types';
 
 const getSupabase = () => {
-  const url = (process.env.SUPABASE_URL || "").trim();
-  const key = (process.env.SUPABASE_KEY || "").trim();
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_KEY;
   
-  if (!url || !key || !url.startsWith('http')) {
-    console.warn("Supabase credentials missing or invalid. Mocking DB operations.");
+  if (!url || !key) {
+    console.warn("Supabase credentials missing. Mocking DB operations.");
     return null;
   }
   
+  // Validate URL format
   try {
-    return createClient(url, key);
-  } catch (err: any) {
-    console.warn("Supabase client creation failed, mocking DB operations:", err.message);
+    new URL(url);
+  } catch (error) {
+    console.warn(`Invalid SUPABASE_URL format: "${url}". Mocking DB operations.`);
     return null;
   }
+  
+  return createClient(url, key);
 };
 
 export async function saveLead(lead: Lead): Promise<string> {
