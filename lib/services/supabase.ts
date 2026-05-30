@@ -8,7 +8,12 @@ const getSupabase = () => {
     console.warn("Supabase credentials missing or invalid. Mocking DB operations.");
     return null;
   }
-  return createClient(url, key);
+  try {
+    return createClient(url, key);
+  } catch (err: any) {
+    console.warn("Supabase client creation failed, mocking DB operations:", err.message);
+    return null;
+  }
 };
 
 export async function saveLead(lead: Lead): Promise<string> {
