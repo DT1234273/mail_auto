@@ -24,7 +24,7 @@ export async function sendTelegramNotification(message: string) {
       },
       body: JSON.stringify({
         chat_id: chatId,
-        text: message
+        text: message.replace(/</g, "&lt;").replace(/>/g, "&gt;")
       }),
     });
 
