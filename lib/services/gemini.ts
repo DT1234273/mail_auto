@@ -2,14 +2,53 @@ import { GoogleGenAI } from '@google/genai';
 import { AuditResult, Lead, OutreachDraft } from '../types';
 import { analyzeWithPageSpeed } from './pagespeed';
 
-const getAiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not set.");
-  return new GoogleGenAI({ apiKey });
-};
+async function generateAiContent(prompt: string): Promise<string> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY Missing");
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      }
+    });
+
+    return response.text || "{}";
+  } catch (err: any) {
+    console.warn("⚠️ Gemini request failed or missing key. Falling back to Llama-3.3-70B on Groq...");
+    return await callLlamaFallback(prompt);
+  }
+}
+
+async function callLlamaFallback(prompt: string): Promise<string> {
+  const groqKey = process.env.GROQ_API_KEY || "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";
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${groqKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ "role": "user", "content": prompt }],
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("Groq API Error:", errText);
+    throw new Error(`Fallback AI failed: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
 
 export async function analyzeWebsiteAndGenerateAudit(websiteUrl: string, category: string, rawPageText?: string): Promise<AuditResult> {
-  const ai = getAiClient();
   const pageSpeedData = await analyzeWithPageSpeed(websiteUrl);
   
   const prompt = `
@@ -27,36 +66,27 @@ Determine if they typically need, or appear to lack:
 
 Return exactly a JSON object matching this TypeScript interface:
 {
-  ssl: boolean, mobile_friendly: boolean, responsive: boolean, contact_form: boolean,
-  speed_score: number (0-100), mobile_score: number (0-100),
-  seo_score: number (0-100), accessibility_score: number (0-100),
-  online_booking: boolean, online_admission: boolean, customer_portal: boolean,
-  ai_chatbot: boolean, automation_features: boolean,
-  overall_score: number (0-100),
-  issues_found: string[],
-  recommendations: string[]
+  "ssl": boolean, "mobile_friendly": boolean, "responsive": boolean, "contact_form": boolean,
+  "speed_score": number, "mobile_score": number,
+  "seo_score": number, "accessibility_score": number,
+  "online_booking": boolean, "online_admission": boolean, "customer_portal": boolean,
+  "ai_chatbot": boolean, "automation_features": boolean,
+  "overall_score": number,
+  "issues_found": ["string array"],
+  "recommendations": ["string array"]
 }
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
-
-    const result = JSON.parse(response.text || "{}");
-    return result as AuditResult;
+    const text = await generateAiContent(prompt);
+    return JSON.parse(text) as AuditResult;
   } catch (err) {
-    console.error("Gemini Audit Error:", err);
+    console.error("Audit Generation Error:", err);
     throw new Error("Failed to generate audit via AI.");
   }
 }
 
 export async function generateOutreachProposal(lead: Lead, audit: AuditResult): Promise<OutreachDraft> {
-  const ai = getAiClient();
   const prompt = `
 You are Dharamveer, a Web Developer. You specialize in building robust apps like Casa Saarthi AI and Fatoora Tools.
 You are pitching a website redesign, automation upgrade, or AI chatbot integration to a prospect.
@@ -79,45 +109,29 @@ Return exactly a JSON object matching this TypeScript interface:
 }
 `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-    }
-  });
-
-  const result = JSON.parse(response.text || "{}");
-  return result as OutreachDraft;
+  const text = await generateAiContent(prompt);
+  return JSON.parse(text) as OutreachDraft;
 }
 
-// Simulated Search for leads using Gemini if real API is missing
 export async function discoverLeadsWithGemini(category: string, city: string): Promise<Lead[]> {
-  const ai = getAiClient();
   const prompt = `
 Generate 3 realistic, but synthetic business leads for the completely automated CRM demo.
 Category: ${category}
 City: ${city}
 
 Return exactly a JSON array matching this interface:
-[{
-  "business_name": "string",
-  "category": "${category}",
-  "city": "${city}",
-  "website": "string (e.g. https://www...)",
-  "email": "string",
-  "phone": "string"
-}]
+[
+  {
+    "business_name": "string",
+    "category": "${category}",
+    "city": "${city}",
+    "website": "string (e.g. https://www...)",
+    "email": "string",
+    "phone": "string"
+  }
+]
 `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-    }
-  });
-
-  const parsed = JSON.parse(response.text || "[]");
-  return parsed as Lead[];
+  const text = await generateAiContent(prompt);
+  return JSON.parse(text || "[]") as Lead[];
 }
