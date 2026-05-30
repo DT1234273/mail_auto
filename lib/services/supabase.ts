@@ -2,12 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { Lead, AuditResult, OutreachDraft } from '../types';
 
 const getSupabase = () => {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_KEY;
+  const url = (process.env.SUPABASE_URL || "").trim();
+  const key = (process.env.SUPABASE_KEY || "").trim();
+  
   if (!url || !key || !url.startsWith('http')) {
     console.warn("Supabase credentials missing or invalid. Mocking DB operations.");
     return null;
   }
+  
   try {
     return createClient(url, key);
   } catch (err: any) {
