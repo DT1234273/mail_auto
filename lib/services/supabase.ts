@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Lead, AuditResult, OutreachDraft } from '../types';
+import WebSocket from 'ws';
 
 const getSupabase = () => {
   const url = process.env.SUPABASE_URL;
@@ -18,7 +19,14 @@ const getSupabase = () => {
     return null;
   }
   
-  return createClient(url, key);
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+    },
+    realtime: {
+      transport: WebSocket as any,
+    }
+  });
 };
 
 export async function saveLead(lead: Lead): Promise<string> {
