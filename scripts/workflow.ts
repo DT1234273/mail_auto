@@ -69,7 +69,8 @@ Emails Sent: ${emailsSent}
 
   } catch (error: any) {
     console.error("\n❌ Workflow Error:", error);
-    await sendTelegramNotification(`⚠️ **Workflow Failed**: ${error.message.replace(/</g, "less than").replace(/>/g, "greater than")}`);
+    const errorMessage = error?.message || String(error);
+    await sendTelegramNotification(`⚠️ Workflow Failed: ${errorMessage}`);
     process.exit(1);
   }
 }
