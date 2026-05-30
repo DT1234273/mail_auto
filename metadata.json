@@ -1,0 +1,6 @@
+{
+  "name": "Casa Saarthi Agent",
+  "description": "AI Outreach Automation Master Configuration & Dashboard",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
