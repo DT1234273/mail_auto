@@ -100,6 +100,10 @@ Issues: ${audit.issues_found.join(', ')}
 Recommendations: ${audit.recommendations.join(', ')}
 
 Write a highly personalized, compelling, and professional cold email pitch. 
+Honestly mention my recent work and include my portfolio website as an example:
+Portfolio Website: https://dharamveer.in (or https://github.com/Dharamveer-Thakor if appropriate).
+Make sure to weave the portfolio link naturally into the pitch so they can see examples of my work.
+
 No placeholder text like "[Your Phone Number]" - sign off as "Dharamveer, Web Developer".
 
 Return exactly a JSON object matching this TypeScript interface:
@@ -115,9 +119,12 @@ Return exactly a JSON object matching this TypeScript interface:
 
 export async function discoverLeadsWithGemini(category: string, city: string): Promise<Lead[]> {
   const prompt = `
-Generate 3 realistic, but synthetic business leads for the completely automated CRM demo.
+Please perform deep research to find 3 ACTUAL, REAL, currently operating business leads.
 Category: ${category}
 City: ${city}
+
+IMPORTANT: DO NOT generate fake or synthetic data. You MUST find real businesses that currently exist in ${city}.
+Provide their ACTUAL public contact email addresses and their real website URLs so that emails do not bounce.
 
 Return exactly a JSON object matching this interface:
 {
