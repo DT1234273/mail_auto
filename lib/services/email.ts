@@ -1,16 +1,19 @@
 import nodemailer from 'nodemailer';
 
-export async function sendEmail(to: string, subject: string, text: string) {
-  const user = process.env.GMAIL_EMAIL;
+export async function sendEmail(to: string, subject: string, htmlContent: string) {
+  const user = process.env.GMAIL_EMAIL || "thakordharamveer@gmail.com";
   const pass = process.env.GMAIL_APP_PASSWORD;
+  const textContent = htmlContent.replace(/<[^>]+>/g, '').trim();
 
-  if (!user || !pass) {
-    console.warn("GMAIL configuration missing. Mocking email send.");
+  // If password is not configured, we'll just mock
+  if (!pass) {
+    console.warn("GMAIL_APP_PASSWORD missing. Mocking email send.");
     console.log(`--- MOCK EMAIL ---
+From: ${user}
 To: ${to}
 Subject: ${subject}
-Body: 
-${text}
+Body (HTML): 
+${htmlContent}
 ------------------`);
     return true;
   }
@@ -25,7 +28,8 @@ ${text}
       from: `"Dharamveer" <${user}>`,
       to,
       subject,
-      text
+      text: textContent,
+      html: htmlContent
     });
     return true;
   } catch (err) {

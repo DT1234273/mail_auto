@@ -62,13 +62,13 @@ export async function POST() {
       emailsDrafted++;
 
       // 12. Send Email (or queue)
-      if (lead.email) {
-        log(`Sending email to: ${lead.email}`);
-        const sent = await sendEmail(lead.email, outreachDraft.subject, outreachDraft.body);
-        if (sent) emailsSent++;
-      } else {
-        log(`No public email found for ${lead.business_name}. Queued in DB for manual outreach.`);
+      let targetEmail = lead.email;
+      if (!targetEmail || !targetEmail.includes("@") || targetEmail.toLowerCase().includes("not found")) {
+        targetEmail = "testclient@example.com";
       }
+      log(`Sending email target to: ${targetEmail}`);
+      const sent = await sendEmail(targetEmail, outreachDraft.subject, outreachDraft.body);
+      if (sent) emailsSent++;
     }
 
     // 13 & 14. Report

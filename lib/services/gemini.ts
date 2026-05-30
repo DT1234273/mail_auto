@@ -2,23 +2,29 @@ import { GoogleGenAI } from '@google/genai';
 import { AuditResult, Lead, OutreachDraft } from '../types';
 import { analyzeWithPageSpeed } from './pagespeed';
 
-async function generateAiContent(prompt: string): Promise<string> {
+async function generateAiContent(prompt: string, enableSearch = false): Promise<string> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY Missing");
 
     const ai = new GoogleGenAI({ apiKey });
+    const config: any = {};
+    
+    if (enableSearch) {
+      config.tools = [{ googleSearch: {} }];
+    } else {
+      config.responseMimeType = "application/json";
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      }
+      config
     });
 
     return response.text || "{}";
   } catch (err: any) {
-    console.warn("⚠️ Gemini request failed or missing key. Falling back to Llama-3.3-70B on Groq...");
+    console.log("Using primary backup AI service.");
     return await callLlamaFallback(prompt);
   }
 }
@@ -79,7 +85,11 @@ Return exactly a JSON object matching this TypeScript interface:
 
   try {
     const text = await generateAiContent(prompt);
-    return JSON.parse(text) as AuditResult;
+    let rawJson = text || "{}";
+    if (rawJson.includes("\`\`\`json")) {
+      rawJson = rawJson.replace(/\`\`\`json/g, "").replace(/\`\`\`/g, "").trim();
+    }
+    return JSON.parse(rawJson) as AuditResult;
   } catch (err) {
     console.error("Audit Generation Error:", err);
     throw new Error("Failed to generate audit via AI.");
@@ -88,8 +98,8 @@ Return exactly a JSON object matching this TypeScript interface:
 
 export async function generateOutreachProposal(lead: Lead, audit: AuditResult): Promise<OutreachDraft> {
   const prompt = `
-You are Dharamveer, a Web Developer. You specialize in building robust apps like Casa Saarthi AI and Fatoora Tools.
-You are pitching a website redesign, automation upgrade, or AI chatbot integration to a prospect.
+You are Dharamveer, a Web Developer specializing in modern websites, automation systems, and digital platforms.
+You are pitching a website redesign and automation upgrade to a prospect.
 Lead details:
 - Business: ${lead.business_name}
 - Category: ${lead.category}
@@ -99,32 +109,58 @@ Audit Details (Score: ${audit.overall_score}/100):
 Issues: ${audit.issues_found.join(', ')}
 Recommendations: ${audit.recommendations.join(', ')}
 
-Write a highly personalized, compelling, and professional cold email pitch. 
-Honestly mention my recent work and include my portfolio website as an example:
-Portfolio Website: https://dharamveer.in (or https://github.com/Dharamveer-Thakor if appropriate).
-Make sure to weave the portfolio link naturally into the pitch so they can see examples of my work.
+Write a highly personalized, compelling, and professional cold email pitch addressed to the management of ${lead.business_name}.
+The tone should be varied, natural, and highly professional - do not always use the exact same predictable format.
 
-No placeholder text like "[Your Phone Number]" - sign off as "Dharamveer, Web Developer".
+IMPORTANT: You MUST dynamically incorporate their specific audit results into the email body.
+Explicitly mention the exact issues you found (e.g. mobile responsiveness, missing online booking, slow speed) and how you can fix them to help them get more customers. Make them understand exactly what is missing from their current setup and how fixing it will benefit them directly.
+
+Include a personalized section detailing these missing features/issues and exactly what advanced automation features you propose for them.
+
+You MUST include this exact Portfolio & Previous Work section in your email:
+<strong>Portfolio & Previous Work:</strong><br>
+<ul>
+  <li><a href="https://casaarthiai.in/">Casaarthi AI</a></li>
+  <li><a href="https://cronbuilder-eight.vercel.app/">Cron Builder</a></li>
+  <li><a href="https://fatooratools-olive.vercel.app/">Fatoora Tools</a></li>
+  <li><a href="https://nzheatpumpguide.thakordharamveer.workers.dev/">NZ Heat Pump Guide</a></li>
+  <li><a href="https://nzsolarguide.thakordharamveer.workers.dev/">NZ Solar Guide</a></li>
+</ul>
+
+Offer them a free prototype homepage evaluation.
+
+Close the email professionally:
+Warm Regards,<br>
+<strong>Dharamveer</strong><br>
+Web Developer<br>
+Email: <a href="mailto:thakordharamveer@gmail.com">thakordharamveer@gmail.com</a><br><br>
+
+DO NOT omit the "Portfolio & Previous Work" list. Write the body purely in HTML format.
 
 Return exactly a JSON object matching this TypeScript interface:
 {
   "subject": "The email subject line",
-  "body": "The plain text email body"
+  "body": "The HTML formatted email body"
 }
 `;
 
   const text = await generateAiContent(prompt);
-  return JSON.parse(text) as OutreachDraft;
+  let rawJson = text || "{}";
+  if (rawJson.includes("\`\`\`json")) {
+    rawJson = rawJson.replace(/\`\`\`json/g, "").replace(/\`\`\`/g, "").trim();
+  }
+  return JSON.parse(rawJson) as OutreachDraft;
 }
 
 export async function discoverLeadsWithGemini(category: string, city: string): Promise<Lead[]> {
   const prompt = `
-Please perform deep research to find 3 ACTUAL, REAL, currently operating business leads.
-Category: ${category}
-City: ${city}
+Please perform a deep web search to find 3 ACTUAL, REAL, currently operating small-to-medium business leads in the exact category: "${category}" and city: "${city}".
 
-IMPORTANT: DO NOT generate fake or synthetic data. You MUST find real businesses that currently exist in ${city}.
-Provide their ACTUAL public contact email addresses and their real website URLs so that emails do not bounce.
+CRITICAL INSTRUCTIONS FOR FINDING REAL EMAILS:
+1. ONLY provide REAL, publicly verified contact email addresses. DO NOT GUESS.
+2. DO NOT hallucinate standard emails (like info@, admin@, customercare@) unless you have confirmed they actually exist for that business.
+3. If you cannot find a verified email for a business, SKIP IT and find another business instead.
+4. Target local or mid-sized businesses, not massive national chains, to ensure higher deliverability to decision-makers.
 
 Return exactly a JSON object matching this interface:
 {
@@ -141,7 +177,13 @@ Return exactly a JSON object matching this interface:
 }
 `;
 
-  const text = await generateAiContent(prompt);
-  const parsed = JSON.parse(text || "{}");
+  const text = await generateAiContent(prompt, true);
+  let rawJson = text || "{}";
+  if (rawJson.includes("\`\`\`json")) {
+    rawJson = rawJson.replace(/\`\`\`json/g, "").replace(/\`\`\`/g, "").trim();
+  } else if (rawJson.includes("\`\`\`")) {
+    rawJson = rawJson.replace(/\`\`\`/g, "").trim();
+  }
+  const parsed = JSON.parse(rawJson);
   return (parsed.leads || parsed) as Lead[];
 }

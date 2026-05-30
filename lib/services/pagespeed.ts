@@ -4,6 +4,11 @@ export async function analyzeWithPageSpeed(url: string) {
     console.warn("PAGESPEED_API_KEY missing. Skipping real PageSpeed audit.");
     return null;
   }
+  
+  if (!url || !url.startsWith("http")) {
+    console.warn(`Invalid URL provided to PageSpeed: ${url}`);
+    return null;
+  }
 
   try {
     const apiEndpoint = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${key}&strategy=mobile`;
@@ -22,8 +27,8 @@ export async function analyzeWithPageSpeed(url: string) {
       mobile_score: score ? Math.round(score * 100) : 0,
       speed_score: score ? Math.round(score * 100) : 0
     };
-  } catch (error) {
-    console.error("PageSpeed API Error:", error);
+  } catch (error: any) {
+    console.warn("PageSpeed API Audit Skipped:", error.message);
     return null;
   }
 }

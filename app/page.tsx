@@ -46,7 +46,7 @@ export default function AgentDashboard() {
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="font-semibold text-sm tracking-tight text-gray-900">Casa Saarthi Agent</h1>
+            <h1 className="font-semibold text-sm tracking-tight text-gray-900">Casaarthi Agent</h1>
             <p className="text-xs text-gray-500">Autonomous CRM</p>
           </div>
         </div>
