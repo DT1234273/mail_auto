@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { discoverLeadsWithGemini, analyzeWebsiteAndGenerateAudit, generateOutreachProposal } from '@/lib/services/gemini';
-import { saveLead, saveAudit, saveOutreach } from '@/lib/services/supabase';
+import { saveLead, saveAudit, saveOutreach, hasEmailBeenProcessed } from '@/lib/services/supabase';
 import { sendTelegramNotification } from '@/lib/services/telegram';
 import { sendEmail } from '@/lib/services/email';
 import { WorkflowResult } from '@/lib/types';
@@ -45,7 +45,13 @@ export async function POST() {
       log(`Processing: ${lead.business_name} (${lead.website})`);
 
       // 4 & 5. Remove Duplicates / Skip checked is handled safely by Supabase constraints or standard logic
-      // In a real flow, we query Supabase. For prototype, we assume new.
+      if (lead.email) {
+        const alreadyEmailed = await hasEmailBeenProcessed(lead.email);
+        if (alreadyEmailed) {
+          log(`Skipping ${lead.business_name} - Email ${lead.email} already processed.`);
+          continue;
+        }
+      }
       
       const leadId = await saveLead(lead);
 

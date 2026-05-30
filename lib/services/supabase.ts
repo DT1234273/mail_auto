@@ -76,6 +76,18 @@ export async function saveOutreach(leadId: string, draft: OutreachDraft) {
   if (error) console.error("Supabase insert outreach error:", error);
 }
 
+export async function hasEmailBeenProcessed(email: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase || !email || email.toLowerCase().includes("not found")) return false; 
+
+  const { data, error } = await supabase.from('leads').select('id').eq('email', email).limit(1);
+  if (error) {
+    console.error("Supabase check email error:", error);
+    return false;
+  }
+  return data && data.length > 0;
+}
+
 export async function getLeadsFromDb(): Promise<any[]> {
   const supabase = getSupabase();
   if (!supabase) return [];

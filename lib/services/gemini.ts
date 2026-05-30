@@ -110,12 +110,12 @@ Issues: ${audit.issues_found.join(', ')}
 Recommendations: ${audit.recommendations.join(', ')}
 
 Write a highly personalized, compelling, and professional cold email pitch addressed to the management of ${lead.business_name}.
-The tone should be varied, natural, and highly professional - do not always use the exact same predictable format.
+The tone should be varied, natural, and highly professional - avoid predictability.
 
 IMPORTANT: You MUST dynamically incorporate their specific audit results into the email body.
 Explicitly mention the exact issues you found (e.g. mobile responsiveness, missing online booking, slow speed) and how you can fix them to help them get more customers. Make them understand exactly what is missing from their current setup and how fixing it will benefit them directly.
 
-Include a personalized section detailing these missing features/issues and exactly what advanced automation features you propose for them.
+Include a personalized section detailing these missing features/issues using clean HTML bullet points (<ul><li>) and exactly what advanced automation features you propose for them. Always use bullet points for readability.
 
 You MUST include this exact Portfolio & Previous Work section in your email:
 <strong>Portfolio & Previous Work:</strong><br>
@@ -156,13 +156,13 @@ export async function discoverLeadsWithGemini(category: string, city: string): P
   const prompt = `
 Please perform a deep web search to find 3 ACTUAL, REAL, currently operating small-to-medium business leads in the exact category: "${category}" and city: "${city}".
 
-CRITICAL INSTRUCTIONS FOR FINDING REAL EMAILS:
-1. ONLY provide REAL, publicly verified contact email addresses. DO NOT GUESS.
-2. DO NOT hallucinate standard emails (like info@, admin@, customercare@) unless you have confirmed they actually exist for that business.
-3. If you cannot find a verified email for a business, SKIP IT and find another business instead.
-4. Target local or mid-sized businesses, not massive national chains, to ensure higher deliverability to decision-makers.
+CRITICAL INSTRUCTIONS FOR FINDING REAL EMAILS (99% ACCURACY REQUIRED):
+1. You MUST find real contact email addresses. DO NOT GUESS.
+2. Search for the business name + "contact email" or look at their listed contact info on their Facebook/LinkedIn pages if needed.
+3. If an email address is "not found", "N/A", or fake, YOU MUST SKIP THAT BUSINESS and find another one that has a clearly listed, verified public email address.
+4. Target local or mid-sized businesses with a verified web presence.
 
-Return exactly a JSON object matching this interface:
+Return exactly a JSON object matching this interface. Every lead MUST have a valid email format (e.g., name@domain.com):
 {
   "leads": [
     {
