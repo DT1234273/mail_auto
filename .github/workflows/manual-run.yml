@@ -1,10 +1,9 @@
 name: Manual Outreach Workflow
 
 on:
-  # This enables the manual "Run workflow" button in the GitHub Actions tab
   workflow_dispatch: 
 
-  # Optional: Uncomment the lines below to also run automatically every day
+  # Uncomment the lines below to run automatically every day
   # schedule:
   #   - cron: '0 5 * * *' # Runs daily at 5:00 AM UTC
 
@@ -15,19 +14,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Trigger App Workflow API
-        # We use curl to securely hit your live application API endpoint.
-        # Ensure you add 'APP_URL' in your GitHub Repository Secrets.
-        run: |
-          echo "Triggering workflow at ${{ secrets.APP_URL }}..."
-          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "${{ secrets.APP_URL }}/api/workflow" \
-            -H "Content-Type: application/json")
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
           
-          echo "$response"
-          
-          # Check if the execution was successful
-          HTTP_STATUS=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTP_STATUS://')
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "Workflow failed with status $HTTP_STATUS"
-            exit 1
-          fi
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Automation Script
+        # This will securely inject your GitHub Secrets into the script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
+        run: npx tsx scripts/workflow.ts
