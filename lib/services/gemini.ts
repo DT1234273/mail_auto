@@ -55,9 +55,10 @@ async function callLlamaFallback(prompt: string): Promise<string> {
 }
 
 export async function analyzeWebsiteAndGenerateAudit(websiteUrl: string, category: string, rawPageText?: string): Promise<AuditResult> {
-  const pageSpeedData = await analyzeWithPageSpeed(websiteUrl);
+  const hasWebsite = websiteUrl && websiteUrl.trim() !== "";
+  const pageSpeedData = hasWebsite ? await analyzeWithPageSpeed(websiteUrl) : null;
   
-  const prompt = `
+  const prompt = hasWebsite ? `
 You are evaluating a website for a business in the category: ${category}.
 URL: ${websiteUrl}
 Real PageSpeed Mobile Score: ${pageSpeedData ? pageSpeedData.mobile_score : 'N/A (Estimate it)'}
@@ -81,6 +82,29 @@ Return exactly a JSON object matching this TypeScript interface:
   "issues_found": ["string array"],
   "recommendations": ["string array"]
 }
+` : `
+You are evaluating a business in the category: ${category}.
+This business currently DOES NOT HAVE A WEBSITE. They only operate offline or via basic social media.
+
+Please perform a simulated business audit based on the fact that they have zero web presence.
+Determine why they desperately need:
+- A Professional Website
+- Online Booking / Admissions
+- AI Chatbot
+- Automation Features
+- Customer Portal
+
+Return exactly a JSON object matching this TypeScript interface. Set all website-specific boolean flags (ssl, responsive) to false and scores to 0.
+{
+  "ssl": false, "mobile_friendly": false, "responsive": false, "contact_form": false,
+  "speed_score": 0, "mobile_score": 0,
+  "seo_score": 0, "accessibility_score": 0,
+  "online_booking": false, "online_admission": false, "customer_portal": false,
+  "ai_chatbot": false, "automation_features": false,
+  "overall_score": 0,
+  "issues_found": ["No professional website exists", "Missed online visibility", ...etc],
+  "recommendations": ["Build a professional website", "Setup online booking", ...etc]
+}
 `;
 
   try {
@@ -97,25 +121,34 @@ Return exactly a JSON object matching this TypeScript interface:
 }
 
 export async function generateOutreachProposal(lead: Lead, audit: AuditResult): Promise<OutreachDraft> {
+  const hasWebsite = lead.website && lead.website.trim() !== "";
+  const auditDetails = hasWebsite 
+    ? `Audit Details (Score: ${audit.overall_score}/100):\nIssues: ${audit.issues_found.join(', ')}\nRecommendations: ${audit.recommendations.join(', ')}`
+    : `Audit Details: The business currently has NO PROFESSIONAL WEBSITE.\nIssues: ${audit.issues_found.join(', ')}\nRecommendations: ${audit.recommendations.join(', ')}`;
+  
+  const pitchContext = hasWebsite 
+    ? "You are pitching a website redesign and automation upgrade to a prospect who already has a website."
+    : "You are pitching a brand new, highly professional website and automation system to a prospect who CURRENTLY DOES NOT HAVE A WEBSITE.";
+
   const prompt = `
 You are Dharamveer, a Web Developer specializing in modern websites, automation systems, and digital platforms.
-You are pitching a website redesign and automation upgrade to a prospect.
+${pitchContext}
 Lead details:
 - Business: ${lead.business_name}
 - Category: ${lead.category}
 - City: ${lead.city}
 
-Audit Details (Score: ${audit.overall_score}/100):
-Issues: ${audit.issues_found.join(', ')}
-Recommendations: ${audit.recommendations.join(', ')}
+${auditDetails}
 
 Write a highly personalized, compelling, and professional cold email pitch addressed to the management of ${lead.business_name}.
-The tone should be varied, natural, and highly professional - avoid predictability.
+Every email MUST be uniquely structured and freshly worded so it does not feel templated. Use varied greetings, opening hooks, and transitions.
 
-IMPORTANT: You MUST dynamically incorporate their specific audit results into the email body.
-Explicitly mention the exact issues you found (e.g. mobile responsiveness, missing online booking, slow speed) and how you can fix them to help them get more customers. Make them understand exactly what is missing from their current setup and how fixing it will benefit them directly.
+IMPORTANT: You MUST dynamically incorporate their specific situation into the email body.
+If they do not have a website, emphasize the massive lost opportunity and how a new modern website will bring them credibility and customers. If they have a website, explicitly mention the exact issues you found (e.g. mobile responsiveness, missing online booking, slow speed) and how you can fix them.
 
-Include a personalized section detailing these missing features/issues using clean HTML bullet points (<ul><li>) and exactly what advanced automation features you propose for them. Always use bullet points for readability.
+To ensure the email is highly scannable and professional, you MUST use HTML formatting effectively:
+- Use <strong>bold text</strong> to highlight key metrics, specific missing features, and the primary benefits you offer.
+- Use clean HTML bullet points (<ul><li>...</li></ul>) to clearly list out the exact issues/missing features in their current setup AND the specific advanced automation features you propose to solve them.
 
 You MUST include this exact Portfolio & Previous Work section in your email:
 <strong>Portfolio & Previous Work:</strong><br>
@@ -154,23 +187,29 @@ Return exactly a JSON object matching this TypeScript interface:
 
 export async function discoverLeadsWithGemini(category: string, city: string): Promise<Lead[]> {
   const prompt = `
-Please perform a deep web search to find 3 ACTUAL, REAL, currently operating small-to-medium business leads in the exact category: "${category}" and city: "${city}".
+Please perform a deep web search to find 4 ACTUAL, REAL, currently operating small-to-medium business leads in the exact category: "${category}" and city: "${city}".
+
+CRUCIAL INSTRUCTION (50/50 RATIO):
+- Find 2 businesses that ALREADY HAVE an existing, live website (for an upgrade/redesign pitch).
+- Find 2 businesses that DO NOT HAVE a website but physically exist (e.g., local shops, stores, schools with only a Facebook page or Google Maps listing but no actual website link) (for a new website creation pitch).
 
 CRITICAL INSTRUCTIONS FOR FINDING REAL EMAILS (99% ACCURACY REQUIRED):
-1. You MUST find real contact email addresses. DO NOT GUESS.
-2. Search for the business name + "contact email" or look at their listed contact info on their Facebook/LinkedIn pages if needed.
-3. If an email address is "not found", "N/A", or fake, YOU MUST SKIP THAT BUSINESS and find another one that has a clearly listed, verified public email address.
-4. Target local or mid-sized businesses with a verified web presence.
+1. EVERY SINGLE LEAD (including those without websites) MUST HAVE A REAL, VERIFIED EMAIL ADDRESS.
+2. For businesses without websites, find their email from their Facebook Page, Yelp, or Google Business listing.
+3. You MUST find real contact email addresses. DO NOT GUESS OR INVENT EMAILS.
+4. If an email address cannot be confirmed verifiable online, YOU MUST SKIP THAT BUSINESS and find another one. Keep searching until you find 4 businesses that ALL have verified email addresses.
+5. Target local or mid-sized businesses.
 
-Return exactly a JSON object matching this interface. Every lead MUST have a valid email format (e.g., name@domain.com):
+Return exactly a JSON object matching this interface:
 {
   "leads": [
     {
       "business_name": "string",
       "category": "${category}",
       "city": "${city}",
-      "website": "string (e.g. https://www...)",
-      "email": "string",
+      "website": "string (The actual URL, or empty string '' if they do NOT have a website)",
+      "email": "string (MUST BE A VALID EMAIL ADDRESS - DO NOT LEAVE EMPTY)",
+      "email_source_url": "string (The URL where you found the email to prove it is real)",
       "phone": "string"
     }
   ]

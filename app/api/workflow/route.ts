@@ -69,12 +69,13 @@ export async function POST() {
 
       // 12. Send Email (or queue)
       let targetEmail = lead.email;
-      if (!targetEmail || !targetEmail.includes("@") || targetEmail.toLowerCase().includes("not found")) {
-        targetEmail = "testclient@example.com";
+      if (!targetEmail || targetEmail.trim() === "" || !targetEmail.includes("@") || targetEmail.toLowerCase().includes("not found")) {
+        log(`No verified email found for ${lead.business_name}. Draft saved in DB, but skipping actual email sending to avoid bounces.`);
+      } else {
+        log(`Sending email target to: ${targetEmail}`);
+        const sent = await sendEmail(targetEmail, outreachDraft.subject, outreachDraft.body);
+        if (sent) emailsSent++;
       }
-      log(`Sending email target to: ${targetEmail}`);
-      const sent = await sendEmail(targetEmail, outreachDraft.subject, outreachDraft.body);
-      if (sent) emailsSent++;
     }
 
     // 13 & 14. Report
