@@ -1,6 +1,6 @@
 import 'dotenv/config'; // Loads .env if running locally
 import { discoverLeadsWithGemini, analyzeWebsiteAndGenerateAudit, generateOutreachProposal } from '../lib/services/gemini';
-import { saveLead, saveAudit, saveOutreach } from '../lib/services/supabase';
+import { saveLead, saveAudit, saveOutreach, hasEmailBeenProcessed } from '../lib/services/supabase';
 import { sendTelegramNotification } from '../lib/services/telegram';
 import { sendEmail } from '../lib/services/email';
 
@@ -34,6 +34,14 @@ async function runWorkflow() {
       console.log(`\n---------------------------------`);
       console.log(`🏢 Processing: ${lead.business_name} (${lead.website})`);
 
+      if (lead.email) {
+        const alreadyEmailed = await hasEmailBeenProcessed(lead.email);
+        if (alreadyEmailed) {
+          console.log(`⏭️ Skipping ${lead.business_name} - Email ${lead.email} already processed.`);
+          continue;
+        }
+      }
+
       const leadId = await saveLead(lead);
 
       console.log(`🩺 Auditing website: ${lead.website}`);
@@ -46,12 +54,13 @@ async function runWorkflow() {
       await saveOutreach(leadId, outreachDraft);
       emailsDrafted++;
 
-      if (lead.email) {
-        console.log(`📧 Sending email to: ${lead.email}`);
-        const sent = await sendEmail(lead.email, outreachDraft.subject, outreachDraft.body);
-        if (sent) emailsSent++;
+      const targetEmail = lead.email;
+      if (!targetEmail || targetEmail.trim() === "" || !targetEmail.includes("@") || targetEmail.toLowerCase().includes("not found")) {
+        console.log(`⚠️ No verified email address found for ${lead.business_name}. Draft saved, skipping sending to prevent bounces.`);
       } else {
-        console.log(`⚠️ No public email found for ${lead.business_name}. Queued in DB.`);
+        console.log(`📧 Sending email to: ${targetEmail}`);
+        const sent = await sendEmail(targetEmail, outreachDraft.subject, outreachDraft.body);
+        if (sent) emailsSent++;
       }
     }
 

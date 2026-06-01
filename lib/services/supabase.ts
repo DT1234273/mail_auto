@@ -35,11 +35,21 @@ const getSupabase = () => {
   });
 };
 
-export async function saveLead(lead: Lead): Promise<string> {
+export async function saveLead(lead: any): Promise<string> {
   const supabase = getSupabase();
   if (!supabase) return `mock-lead-id-${Date.now()}`;
 
-  const { data, error } = await supabase.from('leads').insert([lead]).select().single();
+  const sanitizedLead = {
+    business_name: lead.business_name,
+    category: lead.category,
+    city: lead.city,
+    website: lead.website || "",
+    email: lead.email || null,
+    phone: lead.phone || null,
+    status: lead.status || 'discovered'
+  };
+
+  const { data, error } = await supabase.from('leads').insert([sanitizedLead]).select().single();
   if (error) {
     console.error("Supabase insert lead error:", error);
     return `error-mock-lead-${Date.now()}`;

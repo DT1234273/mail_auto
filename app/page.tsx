@@ -151,7 +151,7 @@ export default function AgentDashboard() {
                   <div className="text-gray-500 h-full flex flex-col items-center justify-center text-center">
                     <Activity className="w-8 h-8 text-gray-700 mb-3" />
                     <p>System idling.</p>
-                    <p>Click "Run Daily Workflow" to initialize automation sequence.</p>
+                    <p>Click &quot;Run Daily Workflow&quot; to initialize automation sequence.</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
