@@ -3,8 +3,11 @@ export interface Lead {
   business_name: string;
   category: string;
   city: string;
+  country: string;
+  language: string;
   website: string;
   email: string | null;
+  email_source_url?: string;
   phone: string | null;
   status?: 'discovered' | 'audited' | 'drafted' | 'sent' | 'replied';
   created_at?: string;

@@ -4,26 +4,14 @@ import { saveLead, saveAudit, saveOutreach, hasEmailBeenProcessed } from '../lib
 import { sendTelegramNotification } from '../lib/services/telegram';
 import { sendEmail } from '../lib/services/email';
 
-const CATEGORY_ROTATION = [
-  "Schools, Colleges, Universities, Coaching Institutes",
-  "Hospitals, Clinics, Dental Clinics",
-  "Restaurants, Hotels, Cafes",
-  "Gyms, Fitness Centers, Yoga Studios",
-  "Real Estate, Builders, Architects",
-  "CA Firms, Law Firms, Consultants",
-  "Retail Stores, Electronics Stores, Furniture Stores"
-];
-
 async function runWorkflow() {
   console.log("🚀 Automation Workflow Started...");
 
   try {
-    const dayIndex = new Date().getDay(); 
-    const category = CATEGORY_ROTATION[dayIndex % 7];
-    console.log(`🎯 Day ${dayIndex}: Target Category is "${category}"`);
+    console.log("🎯 Commencing global deep research for high-value prospects...");
 
-    console.log(`🔍 Searching for leads in category: ${category}`);
-    const leads = await discoverLeadsWithGemini(category, "New Delhi"); 
+    console.log("🔍 Searching for leads globally (highest need, highest success probability)...");
+    const leads = await discoverLeadsWithGemini(); 
     console.log(`✅ Discovered ${leads.length} potential leads.`);
 
     let auditsCompleted = 0;
@@ -32,7 +20,7 @@ async function runWorkflow() {
 
     for (const lead of leads) {
       console.log(`\n---------------------------------`);
-      console.log(`🏢 Processing: ${lead.business_name} (${lead.website})`);
+      console.log(`🏢 Processing: ${lead.business_name} (${lead.website || 'No website'}) in ${lead.city}, ${lead.country} (Lang: ${lead.language})`);
 
       if (lead.email) {
         const alreadyEmailed = await hasEmailBeenProcessed(lead.email);
@@ -44,12 +32,12 @@ async function runWorkflow() {
 
       const leadId = await saveLead(lead);
 
-      console.log(`🩺 Auditing website: ${lead.website}`);
-      const audit = await analyzeWebsiteAndGenerateAudit(lead.website, lead.category);
+      console.log(`🩺 Auditing online presence: ${lead.website || 'N/A'}`);
+      const audit = await analyzeWebsiteAndGenerateAudit(lead.website || "", lead.category);
       await saveAudit(leadId, audit);
       auditsCompleted++;
 
-      console.log(`✍️ Drafting outreach for: ${lead.business_name}`);
+      console.log(`✍️ Drafting outreach for: ${lead.business_name} in ${lead.language || 'English'}`);
       const outreachDraft = await generateOutreachProposal(lead, audit);
       await saveOutreach(leadId, outreachDraft);
       emailsDrafted++;
@@ -66,7 +54,7 @@ async function runWorkflow() {
 
     const reportMessage = `
 🗓 **Daily Workflow Complete**
-Category: ${category}
+Category: Global Broad Search
 Leads Processed: ${leads.length}
 Audits Completed: ${auditsCompleted}
 Emails Drafted: ${emailsDrafted}
