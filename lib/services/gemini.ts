@@ -14,14 +14,14 @@ async function checkDnsOverHttps(domain: string): Promise<boolean> {
   }
 }
 
-async function verifyEmailDeliverability(email: string): Promise<boolean> {
+async function verifyEmailDeliverability(email: string, websiteUrl?: string): Promise<boolean> {
   if (!email || typeof email !== 'string') return false;
   
   let trimmed = email.trim();
   trimmed = trimmed.replace(/^[\s"'(<#●*-]+|[\s"')>.*-]+$/g, '');
   if (trimmed === "") return false;
 
-  console.log(`[verification] Check 1/3: Validating format string for "${trimmed}"`);
+  console.log(`[verification] Check 1/4: Validating format string for "${trimmed}"`);
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(trimmed)) {
     console.log(`[verification] Failed Check 1. Invalid pattern.`);
@@ -31,14 +31,26 @@ async function verifyEmailDeliverability(email: string): Promise<boolean> {
   const [localPart, domain] = trimmed.split('@');
   if (!localPart || !domain) return false;
 
-  console.log(`[verification] Check 2/3: Filtering against known placeholder/dummy providers...`);
+  console.log(`[verification] Check 2/4: Filtering against known placeholder/dummy providers...`);
   const lowercaseLocal = localPart.toLowerCase();
   const lowercaseDomain = domain.toLowerCase();
 
+  const exactLocalBlacklist = [
+    'test', 'example', 'none', 'null', 'notfound', 'dummy', 'fake'
+  ];
+  const genericLocalPrefixes = [
+    'info', 'contact', 'hello', 'admin', 'support', 'sales', 'customercare',
+    'office', 'inquiries', 'enquiries', 'mail'
+  ];
+
+  if (exactLocalBlacklist.includes(lowercaseLocal)) {
+    console.log(`[verification] Failed Check 2. BANNED dummy prefix: ${lowercaseLocal}@`);
+    return false;
+  }
+
   const blacklistWords = [
     'example', 'test', 'dummy', 'placeholder', 'notfound', 'none', 'null', 
-    'undefined', 'yourname', 'someone', 'fake', 'admin@domain', 'info@domain',
-    'contact@domain', 'not_found', 'na@', 'n/a'
+    'undefined', 'yourname', 'someone', 'fake', 'not_found', 'na@', 'n/a'
   ];
 
   for (const word of blacklistWords) {
@@ -58,14 +70,44 @@ async function verifyEmailDeliverability(email: string): Promise<boolean> {
     return false;
   }
 
-  console.log(`[verification] Check 3/3: Running Active DNS records test over HTTPS...`);
+  console.log(`[verification] Check 3/4: Running Active DNS records test over HTTPS...`);
   const hasMx = await checkDnsOverHttps(lowercaseDomain);
   if (!hasMx) {
     console.log(`[verification] Failed Check 3: Domain ${lowercaseDomain} lacks active MX records.`);
     return false;
   }
   
-  console.log(`[verification] Success! Passed all 3 checks for "${trimmed}"`);
+  console.log(`[verification] Check 4/4: HTML Website verification cross-check...`);
+  if (websiteUrl && websiteUrl.startsWith('http')) {
+     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(websiteUrl, { 
+          signal: controller.signal as any,
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+        });
+        clearTimeout(timeoutId);
+        const html = (await res.text()).toLowerCase();
+        
+        if (!html.includes(trimmed.toLowerCase())) {
+           console.log(`[verification] Failed Check 4: The email ${trimmed} was NOT FOUND anywhere on the HTML of ${websiteUrl}. This is a hallucinated email by AI! Rejected to prevent bounce.`);
+           return false;
+        } else {
+           console.log(`[verification] Passed Check 4: Successfully found the email directly on their website HTML. Definitely real!`);
+        }
+     } catch (err: any) {
+        console.log(`[verification] Check 4 fetch failed (${err.message}). We couldn't verify on website.`);
+        if (genericLocalPrefixes.includes(lowercaseLocal)) {
+           console.log(`[verification] Drop ${trimmed}: could not verify via HTML, and it uses a generic AI-hallucinated prefix (${lowercaseLocal}).`);
+           return false;
+        }
+     }
+  } else if (genericLocalPrefixes.includes(lowercaseLocal)) {
+     console.log(`[verification] Failed Check 4: Rejecting ${trimmed} because no website is provided to verify a commonly hallucinated prefix (${lowercaseLocal}).`);
+     return false;
+  }
+
+  console.log(`[verification] Success! Passed all 4 checks for "${trimmed}"`);
   return true;
 }
 
@@ -574,15 +616,12 @@ You are a professional global lead researcher executing on Google Search. Your a
 Your task is to conduct DEEP RESEARCH across ANY COUNTRY in the world where ENGLISH is the primary business language (e.g., USA, UK, Canada, Australia, New Zealand, etc.) to find local businesses/organizations that desperately need a website or digital automation upgrade, and have a HIGH success percentage or probability of buying.
 
 CRITICAL SEARCH & VERIFICATION WORKFLOW:
-1. Candidate Search: Select a high-value English-speaking country, city, and business niche (e.g., healthcare, education, retail, specialized services). Find real-world brick-and-mortar operations. You must target exactly 7 businesses in total.
+1. Candidate Search: Select a high-value English-speaking country, city, and business niche (e.g., healthcare, education, retail, specialized services). Find real-world brick-and-mortar operations. You must search for up to 15 businesses, but return ONLY the absolute best 7.
 2. High Need ("More Need To Create Website"): Prioritize businesses that clearly lack a professional web presence but have high real-world value (e.g. established business but using an outdated 1990s website, or only a Facebook page).
-3. Strict Email Verification (Check 3 Times!): For each candidate business you find, you MUST verify their email address. Do Google search queries like:
-   - "<business_name> <city> contact email"
-   - "<business_name> faceoook email"
-   - "<business_name> website email"
-4. ZERO GUESSED EMAILS: You are STRICTLY FORBIDDEN from guessing email addresses. Do NOT concatenate "info@", "hello@", "contact@", "support@", "customercare@", etc. with their domain name just because you have the business name or website. Unless you verbatim see the email address in official search grounding/snippets, DO NOT return it.
-5. Email Source URL: You must provide the exact Web page, social media listing (e.g. Facebook URL), or directory link where the email was found. If you cannot provide a real source, the lead is disqualified.
-6. Quality Over Quota: If you can search but only find fewer than 7 leads that have truly verified public emails, return only those leads. DO NOT invent email addresses to hit a quota.
+3. Strict Email Verification (Check 100 Times!): For each candidate business you find, you MUST verify their email address. NO BOUNCES ALLOWED.
+4. BANNED GENERIC EMAILS: You are STRICTLY FORBIDDEN from returning emails that start with info@, contact@, hello@, admin@, sales@, support@, office@, or mail@. These are heavily hallucinated and bounce 90% of the time. You MUST find their personal business email (e.g. john.smith@company.com) OR a business-specific free email (e.g. companyname123@gmail.com). If you cannot find a highly specific email, DISQUALIFY the lead.
+5. Email Source URL: You must provide the exact Web page, social media listing (e.g. Facebook URL), or directory link where the exact email string was found.
+6. Quality Over Quota: If you can only find 2 or 3 leads with 100% verified non-generic public emails, return only those. DO NOT invent email addresses to hit the quota of 7.
 7. Language Metadata: You must return "English" for language, as we will exclusively be messaging in English.
 8. ZERO HOAX OR MISSPELLED DOMAINS: You are strictly forbidden from fabricating, misspelling, or creating typos in domains. Double-check spelling against actual search snippets verbatim. If a domain or email contains a typo, the query will fail lookup.
 
@@ -618,7 +657,7 @@ Return a JSON object matching this TypeScript interface:
   const validatedLeads: Lead[] = [];
   for (const lead of rawLeads) {
     if (lead.email) {
-      const isValid = await verifyEmailDeliverability(lead.email);
+      const isValid = await verifyEmailDeliverability(lead.email, lead.website);
       if (!isValid) {
         console.log(`[verification] clean filter enforced for ${lead.business_name} (email omitted)`);
         lead.email = null;
