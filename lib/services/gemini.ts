@@ -21,15 +21,17 @@ async function verifyEmailDeliverability(email: string): Promise<boolean> {
   trimmed = trimmed.replace(/^[\s"'(<#●*-]+|[\s"')>.*-]+$/g, '');
   if (trimmed === "") return false;
 
+  console.log(`[verification] Check 1/3: Validating format string for "${trimmed}"`);
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(trimmed)) {
-    console.log(`[verification] clean format filter check for: "${trimmed}"`);
+    console.log(`[verification] Failed Check 1. Invalid pattern.`);
     return false;
   }
 
   const [localPart, domain] = trimmed.split('@');
   if (!localPart || !domain) return false;
 
+  console.log(`[verification] Check 2/3: Filtering against known placeholder/dummy providers...`);
   const lowercaseLocal = localPart.toLowerCase();
   const lowercaseDomain = domain.toLowerCase();
 
@@ -41,7 +43,7 @@ async function verifyEmailDeliverability(email: string): Promise<boolean> {
 
   for (const word of blacklistWords) {
     if (lowercaseLocal.includes(word) || lowercaseDomain.includes(word)) {
-      console.log(`[verification] filtered custom dictionary: "${trimmed}"`);
+      console.log(`[verification] Failed Check 2. Match found for forbidden word: ${word}`);
       return false;
     }
   }
@@ -52,17 +54,18 @@ async function verifyEmailDeliverability(email: string): Promise<boolean> {
     'yaho.com', 'hotail.com', 'example.org', 'example.net', 'test.com'
   ];
   if (placeholderDomains.includes(lowercaseDomain)) {
-    console.log(`[verification] filtered temporary provider: "${trimmed}"`);
+    console.log(`[verification] Failed Check 2. Temporary/fake domain provider.`);
     return false;
   }
 
+  console.log(`[verification] Check 3/3: Running Active DNS records test over HTTPS...`);
   const hasMx = await checkDnsOverHttps(lowercaseDomain);
   if (!hasMx) {
-    console.log(`[verification] lookup completed: "${lowercaseDomain}" (inactive)`);
+    console.log(`[verification] Failed Check 3: Domain ${lowercaseDomain} lacks active MX records.`);
     return false;
   }
   
-  console.log(`[verification] lookup completed: "${lowercaseDomain}" (active)`);
+  console.log(`[verification] Success! Passed all 3 checks for "${trimmed}"`);
   return true;
 }
 
@@ -519,17 +522,16 @@ Lead details:
 ${auditDetails}
 
 Write a highly personalized, compelling, and professional cold email pitch addressed to the management of ${lead.business_name}.
-CRITICAL INSTRUCTION: You MUST translate and write the ENTIRE subject line and email body in "${lead.language || 'English'}". DO NOT use English unless English is explicitly their local language.
-Every email MUST be uniquely structured and freshly worded so it does not feel templated. Use varied greetings, opening hooks, and transitions.
+CRITICAL INSTRUCTION: You MUST write the ENTIRE subject line and email body in English. DO NOT translate to any other language.
 
 IMPORTANT: You MUST dynamically incorporate their specific situation into the email body.
-If they do not have a website, emphasize the massive lost opportunity and how a new modern website will bring them credibility and customers. If they have a website, explicitly mention the exact issues you found (e.g. mobile responsiveness, missing online booking, slow speed) and how you can fix them.
+If they do not have a website, emphasize the massive lost opportunity and how a new modern website will bring them credibility and customers ("More need to create website" is our core underlying pitch philosophy). If they have a website, explicitly mention the exact issues you found (e.g. mobile responsiveness, missing online booking, slow speed) and how you can fix them.
 
 To ensure the email is highly scannable and professional, you MUST use HTML formatting effectively:
 - Use <strong>bold text</strong> to highlight key metrics, specific missing features, and the primary benefits you offer.
 - Use clean HTML bullet points (<ul><li>...</li></ul>) to clearly list out the exact issues/missing features in their current setup AND the specific advanced automation features you propose to solve them.
 
-You MUST include this exact Portfolio & Previous Work section in your email (NOTICE the single quotes in HTML attributes). Translate the preamble text ("Portfolio & Previous Work:"), but keep the links:
+You MUST include this exact Portfolio & Previous Work section in your email (NOTICE the single quotes in HTML attributes):
 <strong>Portfolio & Previous Work:</strong><br>
 <ul>
   <li><a href='https://casaarthiai.in/'>Casaarthi AI</a></li>
@@ -541,7 +543,7 @@ You MUST include this exact Portfolio & Previous Work section in your email (NOT
 
 Offer them a free prototype homepage evaluation.
 
-Close the email professionally (translate the titles into their language, keep name as Dharamveer):
+Close the email professionally:
 Warm Regards,<br>
 <strong>Dharamveer</strong><br>
 Web Developer<br>
@@ -554,8 +556,8 @@ Your response MUST be 100% valid JSON. In the "body" field, you MUST use SINGLE 
 
 Return exactly a JSON object matching this TypeScript interface:
 {
-  "subject": "The email subject line translated to ${lead.language || 'English'}",
-  "body": "The HTML formatted email body translated to ${lead.language || 'English'}"
+  "subject": "The email subject line in English",
+  "body": "The HTML formatted email body in English"
 }
 `;
 
@@ -569,19 +571,19 @@ Return exactly a JSON object matching this TypeScript interface:
   const prompt = `
 You are a professional global lead researcher executing on Google Search. Your absolute highest priority is ZERO email bounces. Every single email address you return must be 100% real, active, verified, and deliverable.
 
-Your task is to conduct DEEP RESEARCH across ANY COUNTRY in the world to find local businesses/organizations that desperately need a website or digital automation upgrade, and have a HIGH success percentage or probability of buying.
+Your task is to conduct DEEP RESEARCH across ANY COUNTRY in the world where ENGLISH is the primary business language (e.g., USA, UK, Canada, Australia, New Zealand, etc.) to find local businesses/organizations that desperately need a website or digital automation upgrade, and have a HIGH success percentage or probability of buying.
 
 CRITICAL SEARCH & VERIFICATION WORKFLOW:
-1. Candidate Search: Select a high-value country, city, and business niche (e.g., healthcare, education, retail, specialized services). Find real-world brick-and-mortar operations. You must target 2 to 4 businesses.
-2. High Need & Success Probability: Prioritize businesses that clearly lack a professional web presence but have high real-world value (e.g. established business but using an outdated 1990s website, or only a Facebook page).
-3. Strict Email Verification: For each candidate business you find, you MUST explicitly search for their verified public email address. Do Google search queries like:
+1. Candidate Search: Select a high-value English-speaking country, city, and business niche (e.g., healthcare, education, retail, specialized services). Find real-world brick-and-mortar operations. You must target exactly 7 businesses in total.
+2. High Need ("More Need To Create Website"): Prioritize businesses that clearly lack a professional web presence but have high real-world value (e.g. established business but using an outdated 1990s website, or only a Facebook page).
+3. Strict Email Verification (Check 3 Times!): For each candidate business you find, you MUST verify their email address. Do Google search queries like:
    - "<business_name> <city> contact email"
    - "<business_name> faceoook email"
    - "<business_name> website email"
 4. ZERO GUESSED EMAILS: You are STRICTLY FORBIDDEN from guessing email addresses. Do NOT concatenate "info@", "hello@", "contact@", "support@", "customercare@", etc. with their domain name just because you have the business name or website. Unless you verbatim see the email address in official search grounding/snippets, DO NOT return it.
 5. Email Source URL: You must provide the exact Web page, social media listing (e.g. Facebook URL), or directory link where the email was found. If you cannot provide a real source, the lead is disqualified.
-6. Quality Over Quota: If you can search but only find 1, 2, or 3 leads that have truly verified public emails, return only those leads. DO NOT invent email addresses to hit a quota.
-7. Language Metadata: You must identify the primary natural language spoken in that state/country (e.g., Spanish, German, French, Hindi, Japanese) and return it so the system can draft the email in their native language!
+6. Quality Over Quota: If you can search but only find fewer than 7 leads that have truly verified public emails, return only those leads. DO NOT invent email addresses to hit a quota.
+7. Language Metadata: You must return "English" for language, as we will exclusively be messaging in English.
 8. ZERO HOAX OR MISSPELLED DOMAINS: You are strictly forbidden from fabricating, misspelling, or creating typos in domains. Double-check spelling against actual search snippets verbatim. If a domain or email contains a typo, the query will fail lookup.
 
 Return a JSON object matching this TypeScript interface:

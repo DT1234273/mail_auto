@@ -1,15 +1,16 @@
-name: Manual Outreach Workflow
+name: Daily Automated Outreach Workflow
 
 on:
   workflow_dispatch: 
 
-  # Uncomment the lines below to run automatically every day
-  # schedule:
-  #   - cron: '0 5 * * *' # Runs daily at 5:00 AM UTC
+  # Run automatically every day at 1:00 AM UTC
+  schedule:
+    - cron: '0 1 * * *'
 
 jobs:
   run-outreach:
     runs-on: ubuntu-latest
+    timeout-minutes: 360 # Allow up to 6 hours for the 30-min sleep per email
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:

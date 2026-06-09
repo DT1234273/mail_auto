@@ -18,7 +18,8 @@ async function runWorkflow() {
     let emailsDrafted = 0;
     let emailsSent = 0;
 
-    for (const lead of leads) {
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i];
       console.log(`\n---------------------------------`);
       console.log(`🏢 Processing: ${lead.business_name} (${lead.website || 'No website'}) in ${lead.city}, ${lead.country} (Lang: ${lead.language})`);
 
@@ -37,7 +38,7 @@ async function runWorkflow() {
       await saveAudit(leadId, audit);
       auditsCompleted++;
 
-      console.log(`✍️ Drafting outreach for: ${lead.business_name} in ${lead.language || 'English'}`);
+      console.log(`✍️ Drafting outreach for: ${lead.business_name} in English`);
       const outreachDraft = await generateOutreachProposal(lead, audit);
       await saveOutreach(leadId, outreachDraft);
       emailsDrafted++;
@@ -48,7 +49,16 @@ async function runWorkflow() {
       } else {
         console.log(`📧 Sending email to: ${targetEmail}`);
         const sent = await sendEmail(targetEmail, outreachDraft.subject, outreachDraft.body);
-        if (sent) emailsSent++;
+        if (sent) {
+          emailsSent++;
+          console.log(`✅ Sent email successfully to ${targetEmail}`);
+          
+          if (i < leads.length - 1) {
+            console.log(`⏳ Waiting for 30 minutes before sending the next email (Rate limiting / Bouncing prevention)...`);
+            // 30 minutes = 30 * 60 * 1000 = 1800000 ms
+            await new Promise(resolve => setTimeout(resolve, 30 * 60 * 1000));
+          }
+        }
       }
     }
 
