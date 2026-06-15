@@ -21,17 +21,17 @@ async function verifyEmailDeliverability(email: string, websiteUrl?: string): Pr
   trimmed = trimmed.replace(/^[\s"'(<#●*-]+|[\s"')>.*-]+$/g, '');
   if (trimmed === "") return false;
 
-  console.log(`[verification] Check 1/4: Validating format string for "${trimmed}"`);
+  console.log(`[ai-validation-layer] Check 1/4: Validating format string for "${trimmed}"`);
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(trimmed)) {
-    console.log(`[verification] Failed Check 1. Invalid pattern.`);
+    console.log(`[ai-validation-layer] ❌ Failed Check 1. Invalid pattern.`);
     return false;
   }
 
   const [localPart, domain] = trimmed.split('@');
   if (!localPart || !domain) return false;
 
-  console.log(`[verification] Check 2/4: Filtering against known placeholder/dummy providers...`);
+  console.log(`[ai-validation-layer] Check 2/4: Filtering against known placeholder/dummy providers...`);
   const lowercaseLocal = localPart.toLowerCase();
   const lowercaseDomain = domain.toLowerCase();
 
@@ -44,7 +44,7 @@ async function verifyEmailDeliverability(email: string, websiteUrl?: string): Pr
   ];
 
   if (exactLocalBlacklist.includes(lowercaseLocal)) {
-    console.log(`[verification] Failed Check 2. BANNED dummy prefix: ${lowercaseLocal}@`);
+    console.log(`[ai-validation-layer] ❌ Failed Check 2. BANNED dummy prefix: ${lowercaseLocal}@`);
     return false;
   }
 
@@ -55,7 +55,7 @@ async function verifyEmailDeliverability(email: string, websiteUrl?: string): Pr
 
   for (const word of blacklistWords) {
     if (lowercaseLocal.includes(word) || lowercaseDomain.includes(word)) {
-      console.log(`[verification] Failed Check 2. Match found for forbidden word: ${word}`);
+      console.log(`[ai-validation-layer] ❌ Failed Check 2. Match found for forbidden word: ${word}`);
       return false;
     }
   }
@@ -66,22 +66,22 @@ async function verifyEmailDeliverability(email: string, websiteUrl?: string): Pr
     'yaho.com', 'hotail.com', 'example.org', 'example.net', 'test.com'
   ];
   if (placeholderDomains.includes(lowercaseDomain)) {
-    console.log(`[verification] Failed Check 2. Temporary/fake domain provider.`);
+    console.log(`[ai-validation-layer] ❌ Failed Check 2. Temporary/fake domain provider.`);
     return false;
   }
 
-  console.log(`[verification] Check 3/4: Running Active DNS records test over HTTPS...`);
+  console.log(`[ai-validation-layer] Check 3/4: Actively pinging DNS MX records for ${lowercaseDomain}...`);
   const hasMx = await checkDnsOverHttps(lowercaseDomain);
   if (!hasMx) {
-    console.log(`[verification] Failed Check 3: Domain ${lowercaseDomain} lacks active MX records.`);
-    return false;
+     console.log(`[ai-validation-layer] ❌ SECURITY BLOCK: Domain ${lowercaseDomain} lacks active MX records. Gemini hallucinated a fake email! Dropped to prevent bounce.`);
+     return false;
   }
   
-  console.log(`[verification] Check 4/4: HTML Website verification cross-check...`);
+  console.log(`[ai-validation-layer] Check 4/4: Scanning live website HTML for the email string...`);
   if (websiteUrl && websiteUrl.startsWith('http')) {
      try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
         const res = await fetch(websiteUrl, { 
           signal: controller.signal as any,
           headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
@@ -90,24 +90,24 @@ async function verifyEmailDeliverability(email: string, websiteUrl?: string): Pr
         const html = (await res.text()).toLowerCase();
         
         if (!html.includes(trimmed.toLowerCase())) {
-           console.log(`[verification] Failed Check 4: The email ${trimmed} was NOT FOUND anywhere on the HTML of ${websiteUrl}. This is a hallucinated email by AI! Rejected to prevent bounce.`);
+           console.log(`[ai-validation-layer] ❌ SECURITY BLOCK: The email ${trimmed} was NOT FOUND anywhere on the HTML of ${websiteUrl}. This is a hallucinated email by AI! Dropped to prevent bounce.`);
            return false;
         } else {
-           console.log(`[verification] Passed Check 4: Successfully found the email directly on their website HTML. Definitely real!`);
+           console.log(`[ai-validation-layer] ✅ Passed Check 4: Successfully found the email directly on their website HTML. Definitely real!`);
         }
      } catch (err: any) {
-        console.log(`[verification] Check 4 fetch failed (${err.message}). We couldn't verify on website.`);
+        console.log(`[ai-validation-layer] Check 4 fetch skipped (${err.message}) - Website blocked scraping.`);
         if (genericLocalPrefixes.includes(lowercaseLocal)) {
-           console.log(`[verification] Drop ${trimmed}: could not verify via HTML, and it uses a generic AI-hallucinated prefix (${lowercaseLocal}).`);
+           console.log(`[ai-validation-layer] ❌ Drop ${trimmed}: Could not verify via HTML, and it uses a generic AI prefix (${lowercaseLocal}). Blocked!`);
            return false;
         }
      }
   } else if (genericLocalPrefixes.includes(lowercaseLocal)) {
-     console.log(`[verification] Failed Check 4: Rejecting ${trimmed} because no website is provided to verify a commonly hallucinated prefix (${lowercaseLocal}).`);
+     console.log(`[ai-validation-layer] ❌ SECURITY BLOCK: Rejecting ${trimmed} because no website is provided to verify a commonly hallucinated prefix (${lowercaseLocal}). Dropped!`);
      return false;
   }
 
-  console.log(`[verification] Success! Passed all 4 checks for "${trimmed}"`);
+  console.log(`[ai-validation-layer] ✨ SUCCESS! Email "${trimmed}" is fully verified and safe to send!`);
   return true;
 }
 
@@ -566,8 +566,8 @@ ${auditDetails}
 Write a highly personalized, compelling, and professional cold email pitch addressed to the management of ${lead.business_name}.
 CRITICAL INSTRUCTION: You MUST write the ENTIRE subject line and email body in English. DO NOT translate to any other language.
 
-IMPORTANT: You MUST dynamically incorporate their specific situation into the email body.
-If they do not have a website, emphasize the massive lost opportunity and how a new modern website will bring them credibility and customers ("More need to create website" is our core underlying pitch philosophy). If they have a website, explicitly mention the exact issues you found (e.g. mobile responsiveness, missing online booking, slow speed) and how you can fix them.
+IMPORTANT: You MUST dynamically incorporate their specific situation into the email body based on their LinkedIn posts or stated requirements.
+Mention respectfully that you saw their requirement or profile on LinkedIn and would love to help them build their website or digital solution. Emphasize how a new modern website tailored to their exact needs will bring them credibility and customers ("More need to create website" is our core underlying pitch philosophy). If they currently have a poor website, explicitly mention the exact issues you found.
 
 To ensure the email is highly scannable and professional, you MUST use HTML formatting effectively:
 - Use <strong>bold text</strong> to highlight key metrics, specific missing features, and the primary benefits you offer.
@@ -613,15 +613,15 @@ Return exactly a JSON object matching this TypeScript interface:
   const prompt = `
 You are a professional global lead researcher executing on Google Search. Your absolute highest priority is ZERO email bounces. Every single email address you return must be 100% real, active, verified, and deliverable.
 
-Your task is to conduct DEEP RESEARCH across ANY COUNTRY in the world where ENGLISH is the primary business language (e.g., USA, UK, Canada, Australia, New Zealand, etc.) to find local businesses/organizations that desperately need a website or digital automation upgrade, and have a HIGH success percentage or probability of buying.
+Your task is to conduct DEEP RESEARCH using Google Search targeting LINKEDIN (site:linkedin.com) across ANY COUNTRY in the world where ENGLISH is the primary business language (e.g., USA, UK, Canada, Australia, New Zealand, etc.). You must find individuals or companies on LinkedIn actively posting that they need a website, web developer, or digital automation upgrade, and have a HIGH success percentage.
 
 CRITICAL SEARCH & VERIFICATION WORKFLOW:
-1. Candidate Search: Select a high-value English-speaking country, city, and business niche (e.g., healthcare, education, retail, specialized services). Find real-world brick-and-mortar operations. You must search for up to 15 businesses, but return ONLY the absolute best 7.
-2. High Need ("More Need To Create Website"): Prioritize businesses that clearly lack a professional web presence but have high real-world value (e.g. established business but using an outdated 1990s website, or only a Facebook page).
-3. Strict Email Verification (Check 100 Times!): For each candidate business you find, you MUST verify their email address. NO BOUNCES ALLOWED.
+1. Candidate Search: Use Google Search operators like 'site:linkedin.com/in OR site:linkedin.com/posts "looking for a web developer" OR "need a website"'. You must search for up to 15 potential leads, but return ONLY the absolute best 7.
+2. High Need ("More Need To Create Website"): Prioritize people or businesses on LinkedIn that explicitly posted a requirement for website creation or digital solutions.
+3. Strict Email Verification (Check 100 Times!): For each candidate business you find, you MUST verify their email address. NO BOUNCES ALLOWED. We HIGHLY ENCOURAGE finding businesses that use @gmail.com, @yahoo.com, or @outlook.com as these are highly reliable and guaranteed not to bounce MX tests.
 4. BANNED GENERIC EMAILS: You are STRICTLY FORBIDDEN from returning emails that start with info@, contact@, hello@, admin@, sales@, support@, office@, or mail@. These are heavily hallucinated and bounce 90% of the time. You MUST find their personal business email (e.g. john.smith@company.com) OR a business-specific free email (e.g. companyname123@gmail.com). If you cannot find a highly specific email, DISQUALIFY the lead.
 5. Email Source URL: You must provide the exact Web page, social media listing (e.g. Facebook URL), or directory link where the exact email string was found.
-6. Quality Over Quota: If you can only find 2 or 3 leads with 100% verified non-generic public emails, return only those. DO NOT invent email addresses to hit the quota of 7.
+6. Quality Over Quota: If you can only find 2 or 3 leads with 100% verified non-generic public emails, return only those. DO NOT invent email addresses to hit the quota of 7. It is purely better to return [] than a hallucinated domain! My automated system does DNS MX checks. If you hallucinate emails like "sydneydentalcare.com.au" that lack MX records, you will be severely penalized!
 7. Language Metadata: You must return "English" for language, as we will exclusively be messaging in English.
 8. ZERO HOAX OR MISSPELLED DOMAINS: You are strictly forbidden from fabricating, misspelling, or creating typos in domains. Double-check spelling against actual search snippets verbatim. If a domain or email contains a typo, the query will fail lookup.
 
@@ -659,7 +659,7 @@ Return a JSON object matching this TypeScript interface:
     if (lead.email) {
       const isValid = await verifyEmailDeliverability(lead.email, lead.website);
       if (!isValid) {
-        console.log(`[verification] clean filter enforced for ${lead.business_name} (email omitted)`);
+        console.log(`[ai-validation-layer] ENFORCED POLICY: Dropped lead for ${lead.business_name} because AI hallucinated an invalid email (${lead.email}).`);
         lead.email = null;
       } else {
         console.log(`[verification] clean filter verified for ${lead.business_name}: "${lead.email}"`);
