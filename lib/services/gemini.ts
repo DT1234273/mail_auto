@@ -14,7 +14,7 @@ async function checkDnsOverHttps(domain: string): Promise<boolean> {
   }
 }
 
-async function verifyEmailDeliverability(email: string, websiteUrl?: string): Promise<boolean> {
+async function verifyEmailDeliverability(email: string, websiteUrl?: string, emailSourceUrl?: string): Promise<boolean> {
   if (!email || typeof email !== 'string') return false;
   
   let trimmed = email.trim();
@@ -77,34 +77,45 @@ async function verifyEmailDeliverability(email: string, websiteUrl?: string): Pr
      return false;
   }
   
-  console.log(`[ai-validation-layer] Check 4/4: Scanning live website HTML for the email string...`);
-  if (websiteUrl && websiteUrl.startsWith('http')) {
+  console.log(`[ai-validation-layer] Check 4/4: Scanning live website HTML or source URL for the email string...`);
+  let foundInHtml = false;
+  const urlsToCheck = [];
+  if (websiteUrl && websiteUrl.startsWith('http')) urlsToCheck.push(websiteUrl);
+  if (emailSourceUrl && emailSourceUrl.startsWith('http') && emailSourceUrl !== websiteUrl) urlsToCheck.push(emailSourceUrl);
+
+  for (const url of urlsToCheck) {
      try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 12000);
-        const res = await fetch(websiteUrl, { 
+        const res = await fetch(url, { 
           signal: controller.signal as any,
           headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
         });
         clearTimeout(timeoutId);
         const html = (await res.text()).toLowerCase();
         
-        if (!html.includes(trimmed.toLowerCase())) {
-           console.log(`[ai-validation-layer] ❌ SECURITY BLOCK: The email ${trimmed} was NOT FOUND anywhere on the HTML of ${websiteUrl}. This is a hallucinated email by AI! Dropped to prevent bounce.`);
-           return false;
-        } else {
-           console.log(`[ai-validation-layer] ✅ Passed Check 4: Successfully found the email directly on their website HTML. Definitely real!`);
+        if (html.includes(trimmed.toLowerCase())) {
+           foundInHtml = true;
+           console.log(`[ai-validation-layer] ✅ Passed Check 4: Successfully found the email directly on ${url}. Definitely real!`);
+           break;
         }
      } catch (err: any) {
-        console.log(`[ai-validation-layer] Check 4 fetch skipped (${err.message}) - Website blocked scraping.`);
-        if (genericLocalPrefixes.includes(lowercaseLocal)) {
-           console.log(`[ai-validation-layer] ❌ Drop ${trimmed}: Could not verify via HTML, and it uses a generic AI prefix (${lowercaseLocal}). Blocked!`);
-           return false;
-        }
+        console.log(`[ai-validation-layer] Check 4 fetch skipped for ${url} (${err.message}) - Blocked scraping or timeout.`);
      }
-  } else if (genericLocalPrefixes.includes(lowercaseLocal)) {
-     console.log(`[ai-validation-layer] ❌ SECURITY BLOCK: Rejecting ${trimmed} because no website is provided to verify a commonly hallucinated prefix (${lowercaseLocal}). Dropped!`);
-     return false;
+  }
+
+  if (!foundInHtml && urlsToCheck.length > 0) {
+      if (genericLocalPrefixes.includes(lowercaseLocal) || ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'].includes(lowercaseDomain)) {
+           console.log(`[ai-validation-layer] ❌ Drop ${trimmed}: Could not verify via HTML scraping, and it is a high-risk AI-hallucinated address (${lowercaseDomain} or generic prefix). Blocked!`);
+           return false;
+      } else {
+           console.log(`[ai-validation-layer] ⚠️ Warning: The email ${trimmed} was NOT FOUND anywhere on the HTML of provided URLs, but allowing it because it's a custom domain.`);
+      }
+  } else if (!foundInHtml && urlsToCheck.length === 0) {
+      if (genericLocalPrefixes.includes(lowercaseLocal) || ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'].includes(lowercaseDomain)) {
+         console.log(`[ai-validation-layer] ❌ SECURITY BLOCK: Rejecting ${trimmed} because no URL is provided to verify a high-risk address (${lowercaseDomain} or generic prefix). Dropped!`);
+         return false;
+      }
   }
 
   console.log(`[ai-validation-layer] ✨ SUCCESS! Email "${trimmed}" is fully verified and safe to send!`);
@@ -618,10 +629,10 @@ Your task is to conduct DEEP RESEARCH using Google Search targeting LINKEDIN (si
 CRITICAL SEARCH & VERIFICATION WORKFLOW:
 1. Candidate Search: Use Google Search operators like 'site:linkedin.com/in OR site:linkedin.com/posts "looking for a web developer" OR "need a website"'. You must search for up to 15 potential leads, but return ONLY the absolute best 7.
 2. High Need ("More Need To Create Website"): Prioritize people or businesses on LinkedIn that explicitly posted a requirement for website creation or digital solutions.
-3. Strict Email Verification (Check 100 Times!): For each candidate business you find, you MUST verify their email address. NO BOUNCES ALLOWED. We HIGHLY ENCOURAGE finding businesses that use @gmail.com, @yahoo.com, or @outlook.com as these are highly reliable and guaranteed not to bounce MX tests.
-4. BANNED GENERIC EMAILS: You are STRICTLY FORBIDDEN from returning emails that start with info@, contact@, hello@, admin@, sales@, support@, office@, or mail@. These are heavily hallucinated and bounce 90% of the time. You MUST find their personal business email (e.g. john.smith@company.com) OR a business-specific free email (e.g. companyname123@gmail.com). If you cannot find a highly specific email, DISQUALIFY the lead.
-5. Email Source URL: You must provide the exact Web page, social media listing (e.g. Facebook URL), or directory link where the exact email string was found.
-6. Quality Over Quota: If you can only find 2 or 3 leads with 100% verified non-generic public emails, return only those. DO NOT invent email addresses to hit the quota of 7. It is purely better to return [] than a hallucinated domain! My automated system does DNS MX checks. If you hallucinate emails like "sydneydentalcare.com.au" that lack MX records, you will be severely penalized!
+3. Strict Email Verification (Check 100 Times!): For each candidate business you find, you MUST verify their email address. NO BOUNCES ALLOWED. DO NOT invent emails like <business_name>@gmail.com or <business_name>123@outlook.com. I will check for these and penalize you.
+4. BANNED GENERIC EMAILS: You are STRICTLY FORBIDDEN from returning emails that start with info@, contact@, hello@, admin@, sales@, support@, office@, or mail@. These are heavily hallucinated and bounce 90% of the time. You MUST find their verified personal business email (e.g. john.smith@company.com) or a verified business email. If you cannot find a highly specific, real email, DISQUALIFY the lead.
+5. Email Source URL: You must provide the exact Web page, social media listing (e.g. Facebook URL), or directory link where the exact email string was found. You MUST NOT hallucinate this URL.
+6. Quality Over Quota: If you can only find 2 or 3 leads with 100% verified non-generic public emails, return only those. DO NOT invent email addresses to hit the quota of 7. It is purely better to return [] than a hallucinated email. My automated system does DNS MX checks and bounce detection. If you hallucinate emails, you will be severely penalized!
 7. Language Metadata: You must return "English" for language, as we will exclusively be messaging in English.
 8. ZERO HOAX OR MISSPELLED DOMAINS: You are strictly forbidden from fabricating, misspelling, or creating typos in domains. Double-check spelling against actual search snippets verbatim. If a domain or email contains a typo, the query will fail lookup.
 
@@ -657,7 +668,7 @@ Return a JSON object matching this TypeScript interface:
   const validatedLeads: Lead[] = [];
   for (const lead of rawLeads) {
     if (lead.email) {
-      const isValid = await verifyEmailDeliverability(lead.email, lead.website);
+      const isValid = await verifyEmailDeliverability(lead.email, lead.website, lead.email_source_url);
       if (!isValid) {
         console.log(`[ai-validation-layer] ENFORCED POLICY: Dropped lead for ${lead.business_name} because AI hallucinated an invalid email (${lead.email}).`);
         lead.email = null;
